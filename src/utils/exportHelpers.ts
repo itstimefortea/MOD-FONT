@@ -163,75 +163,90 @@ const shapeToOpentypePath = (shape: Shape, canvasSize: number): opentype.Path =>
  * Export the entire font as a TrueType font file (.ttf)
  */
 export const exportFontAsTTF = (font: Font): void => {
-  const { meta, metrics, glyphs } = font;
+  try {
+    console.log('exportFontAsTTF called', font);
+    console.log('opentype object:', opentype);
 
-  // Calculate units per em (standard is 1000 for TrueType)
-  const unitsPerEm = 1000;
-  const gridSize = metrics.gridSize;
-  const canvasSize = gridSize * CELL_SIZE;
+    const { meta, metrics, glyphs } = font;
 
-  // Scale factor from canvas pixels to font units
-  const scale = unitsPerEm / canvasSize;
+    // Calculate units per em (standard is 1000 for TrueType)
+    const unitsPerEm = 1000;
+    const gridSize = metrics.gridSize;
+    const canvasSize = gridSize * CELL_SIZE;
 
-  // Create notdef glyph (required for all fonts)
-  const notdefGlyph = new opentype.Glyph({
-    name: '.notdef',
-    unicode: 0,
-    advanceWidth: Math.round(metrics.defaultAdvanceWidth * scale),
-    path: new opentype.Path(),
-  });
+    // Scale factor from canvas pixels to font units
+    const scale = unitsPerEm / canvasSize;
 
-  // Convert each glyph to opentype format
-  const opentypeGlyphs: opentype.Glyph[] = [notdefGlyph];
-
-  Object.values(glyphs).forEach((glyph) => {
-    const path = new opentype.Path();
-
-    // Combine all shapes into one path
-    glyph.shapes.forEach((shape) => {
-      const shapePath = shapeToOpentypePath(shape, canvasSize);
-      // Add the shape's commands to the main path
-      path.commands = path.commands.concat(shapePath.commands);
+    console.log('Creating notdef glyph...');
+    // Create notdef glyph (required for all fonts)
+    const notdefGlyph = new opentype.Glyph({
+      name: '.notdef',
+      unicode: 0,
+      advanceWidth: Math.round(metrics.defaultAdvanceWidth * scale),
+      path: new opentype.Path(),
     });
 
-    // Scale the path to font units
-    path.commands.forEach((cmd: any) => {
-      if (cmd.x !== undefined) cmd.x = Math.round(cmd.x * scale);
-      if (cmd.y !== undefined) cmd.y = Math.round(cmd.y * scale);
-      if (cmd.x1 !== undefined) cmd.x1 = Math.round(cmd.x1 * scale);
-      if (cmd.y1 !== undefined) cmd.y1 = Math.round(cmd.y1 * scale);
-      if (cmd.x2 !== undefined) cmd.x2 = Math.round(cmd.x2 * scale);
-      if (cmd.y2 !== undefined) cmd.y2 = Math.round(cmd.y2 * scale);
+    // Convert each glyph to opentype format
+    const opentypeGlyphs: opentype.Glyph[] = [notdefGlyph];
+
+    console.log('Converting glyphs...', Object.keys(glyphs).length);
+    Object.values(glyphs).forEach((glyph) => {
+      const path = new opentype.Path();
+
+      // Combine all shapes into one path
+      glyph.shapes.forEach((shape) => {
+        const shapePath = shapeToOpentypePath(shape, canvasSize);
+        // Add the shape's commands to the main path
+        path.commands = path.commands.concat(shapePath.commands);
+      });
+
+      // Scale the path to font units
+      path.commands.forEach((cmd: any) => {
+        if (cmd.x !== undefined) cmd.x = Math.round(cmd.x * scale);
+        if (cmd.y !== undefined) cmd.y = Math.round(cmd.y * scale);
+        if (cmd.x1 !== undefined) cmd.x1 = Math.round(cmd.x1 * scale);
+        if (cmd.y1 !== undefined) cmd.y1 = Math.round(cmd.y1 * scale);
+        if (cmd.x2 !== undefined) cmd.x2 = Math.round(cmd.x2 * scale);
+        if (cmd.y2 !== undefined) cmd.y2 = Math.round(cmd.y2 * scale);
+      });
+
+      const opentypeGlyph = new opentype.Glyph({
+        name: glyph.char === ' ' ? 'space' : glyph.char,
+        unicode: glyph.unicode,
+        advanceWidth: Math.round(glyph.advanceWidth * scale),
+        path: path,
+      });
+
+      opentypeGlyphs.push(opentypeGlyph);
     });
 
-    const opentypeGlyph = new opentype.Glyph({
-      name: glyph.char === ' ' ? 'space' : glyph.char,
-      unicode: glyph.unicode,
-      advanceWidth: Math.round(glyph.advanceWidth * scale),
-      path: path,
+    console.log('Creating font...');
+    // Create the font
+    // Note: metrics.descender is already negative in our data structure
+    const opentypeFont = new opentype.Font({
+      familyName: meta.familyName,
+      styleName: meta.styleName,
+      unitsPerEm: unitsPerEm,
+      ascender: Math.round(metrics.ascender * scale),
+      descender: Math.round(metrics.descender * scale), // Already negative in our data
+      glyphs: opentypeGlyphs,
     });
 
-    opentypeGlyphs.push(opentypeGlyph);
-  });
-
-  // Create the font
-  const opentypeFont = new opentype.Font({
-    familyName: meta.familyName,
-    styleName: meta.styleName,
-    unitsPerEm: unitsPerEm,
-    ascender: Math.round(metrics.ascender * scale),
-    descender: Math.round(-metrics.descender * scale), // Negative for below baseline
-    glyphs: opentypeGlyphs,
-  });
-
-  // Download the font
-  const arrayBuffer = opentypeFont.toArrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: 'font/ttf' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${meta.familyName}-${meta.styleName}.ttf`;
-  a.click();
-  URL.revokeObjectURL(url);
+    console.log('Converting to array buffer...');
+    // Download the font
+    const arrayBuffer = opentypeFont.toArrayBuffer();
+    console.log('Creating blob and downloading...');
+    const blob = new Blob([arrayBuffer], { type: 'font/ttf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${meta.familyName}-${meta.styleName}.ttf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    console.log('TTF export complete!');
+  } catch (error) {
+    console.error('Error exporting TTF:', error);
+    alert(`Error exporting TTF: ${error instanceof Error ? error.message : String(error)}`);
+  }
 };
 

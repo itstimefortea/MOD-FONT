@@ -6,13 +6,19 @@ A modern, web-based typeface editor for creating modular fonts using geometric s
 
 - **Shape-Based Design**: Build glyphs using squares, circles, triangles, and quarter circles
 - **Interactive Canvas**: Draw, select, and transform shapes with intuitive mouse controls
+- **Multi-Selection**: Select and manipulate multiple shapes at once (Shift+click or drag-to-select)
 - **High Performance**: 60fps smooth rendering with RAF throttling and React optimization
 - **Keyboard Shortcuts**: Efficient workflow with comprehensive keyboard shortcuts
 - **Live Preview**: See your typeface in action with real-time text preview
-- **Import/Export**: Save and load your work as JSON, export glyphs as SVG
+- **Export Options**:
+  - Export as JSON (save your work)
+  - Export as TTF (TrueType Font for use in other programs)
+  - Export individual glyphs as SVG
+- **Import/Load**: Load existing fonts from JSON files
 - **Undo/Redo**: Full history management per glyph
 - **Grid System**: Configurable grid resolutions (6×6 to 16×16)
 - **Touch Support**: Works on touch devices with pointer events
+- **Resizable Panels**: Adjust workspace layout to your preference
 
 ## Getting Started
 
@@ -53,11 +59,18 @@ npm run preview
 #### Editing
 - `Ctrl/Cmd + Z` - Undo
 - `Ctrl/Cmd + Shift + Z` - Redo
-- `Ctrl/Cmd + D` - Duplicate selected shape
-- `Delete / Backspace` - Delete selected shape
+- `Ctrl/Cmd + D` - Duplicate selected shape(s)
+- `Delete / Backspace` - Delete selected shape(s)
 - `H` - Flip horizontal
 - `Shift + V` - Flip vertical
 - `R` - Rotate 90°
+
+#### Selection
+- `Shift + Click` - Add shape to selection
+- `Ctrl/Cmd + Click` - Toggle shape in selection
+- `Ctrl/Cmd + A` - Select all shapes
+- `Escape` - Deselect all
+- Drag on canvas - Select multiple shapes with selection box
 
 #### Alignment
 - `Shift + L` - Align left
@@ -75,31 +88,34 @@ npm run preview
 ```
 src/
 ├── components/          # React components
-│   ├── EditorCanvas.tsx
-│   ├── GlyphGrid.tsx
-│   ├── Inspector.tsx
-│   ├── PreviewBar.tsx
-│   ├── ShapePalette.tsx
-│   ├── ShortcutsModal.tsx
-│   └── Toolbar.tsx
+│   ├── EditorCanvas.tsx    # Main drawing canvas
+│   ├── GlyphGrid.tsx       # Glyph selection sidebar
+│   ├── Inspector.tsx       # Properties panel
+│   ├── PreviewPanel.tsx    # Text preview
+│   ├── ResizablePanel.tsx  # Resizable panel wrapper
+│   ├── ShapePalette.tsx    # Shape and tool selector
+│   ├── ShortcutsModal.tsx  # Keyboard shortcuts help
+│   └── Toolbar.tsx         # Top toolbar
 ├── hooks/              # Custom React hooks
-│   ├── useFontEditor.ts
-│   └── useShapeTransform.ts
+│   ├── useFontEditor.ts       # Font state management
+│   ├── useKeyboardShortcuts.ts # Keyboard shortcuts
+│   └── useShapeTransform.ts    # Shape transformations
 ├── utils/              # Utility functions
-│   ├── exportHelpers.ts
-│   ├── fontFactory.ts
-│   ├── shapeFactory.ts
-│   ├── shapeRenderer.tsx
-│   └── svgHelpers.ts
+│   ├── exportHelpers.ts       # JSON, TTF, SVG export
+│   ├── fontFactory.ts         # Create default fonts
+│   ├── fontValidator.ts       # Validate font data
+│   ├── shapeFactory.ts        # Create shapes
+│   ├── shapeRenderer.tsx      # Render shapes
+│   ├── svgHelpers.ts          # SVG utilities
+│   └── svgShapeGenerator.ts   # SVG path generation
 ├── constants/          # Constants and definitions
-│   ├── shapes.ts
-│   └── shortcuts.ts
+│   ├── shapes.tsx         # Shape definitions
+│   └── shortcuts.ts       # Keyboard shortcuts list
 ├── types/              # TypeScript type definitions
 │   └── index.ts
 ├── App.tsx             # Main application component
 ├── main.tsx            # Application entry point
 └── index.css           # Global styles
-
 ```
 
 ## Technology Stack
@@ -110,6 +126,8 @@ src/
 - **Tailwind CSS** - Utility-first styling
 - **Phosphor Icons** - Clean, modern icons
 - **SVG** - High-quality vector rendering
+- **opentype.js** - TrueType font generation
+- **Zod** - Runtime type validation
 
 ## Performance
 
@@ -121,8 +139,6 @@ The editor is optimized for smooth, responsive performance:
 - **Boundary clamping** to keep shapes within canvas
 - **Improved hit detection** for reliable shape selection
 - **Pointer events** for better touch device support
-
-See [PERFORMANCE_IMPROVEMENTS.md](./PERFORMANCE_IMPROVEMENTS.md) for details.
 
 ## Development
 
@@ -150,5 +166,3 @@ MIT
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
-
-# MOD_FONT
