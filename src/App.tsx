@@ -10,7 +10,7 @@ import { ResizablePanel } from './components/ResizablePanel';
 import { useFontEditor } from './hooks/useFontEditor';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { ShapeType, Tool } from './types';
-import { exportFontAsJSON } from './utils/exportHelpers';
+import { exportFontAsJSON, exportFontAsTTF } from './utils/exportHelpers';
 import { validateFontWithErrors } from './utils/fontValidator';
 
 function App() {
@@ -38,6 +38,10 @@ function App() {
 
   const handleExportJSON = () => {
     exportFontAsJSON(font);
+  };
+
+  const handleExportTTF = () => {
+    exportFontAsTTF(font);
   };
 
   const handleImportJSON = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -94,6 +98,7 @@ function App() {
       <Toolbar
         font={font}
         onExportJSON={handleExportJSON}
+        onExportTTF={handleExportTTF}
         onImportJSON={handleImportJSON}
         onShowShortcuts={() => setShowShortcuts(true)}
       />
