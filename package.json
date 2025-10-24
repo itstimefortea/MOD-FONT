@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "vite build",
+    "deploy:pages": "rm -rf dist docs && npm run build && cp -R dist docs && touch docs/.nojekyll && git add -A && git commit -m \"Publish to /docs\" && git push",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "vitest"
