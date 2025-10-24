@@ -143,6 +143,7 @@ function App() {
               history={history}
               saveToHistory={saveToHistory}
               onDuplicateShape={duplicateShape}
+              onUpdateMetrics={updateMetrics}
             />
           </div>
 

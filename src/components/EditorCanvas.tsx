@@ -32,6 +32,7 @@ interface EditorCanvasProps {
   history: History;
   saveToHistory: () => void;
   onDuplicateShape: (shapeId: number) => void;
+  onUpdateMetrics: (updates: Partial<Font['metrics']>) => void;
 }
 
 export const EditorCanvas: React.FC<EditorCanvasProps> = ({
@@ -49,6 +50,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   history,
   saveToHistory,
   onDuplicateShape,
+  onUpdateMetrics,
 }) => {
   const glyph = font.glyphs[currentGlyph];
   const svgRef = useRef<SVGSVGElement>(null);
@@ -70,9 +72,79 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   const [previewBox, setPreviewBox] = useState<PreviewBox | null>(null);
   const [selectionBox, setSelectionBox] = useState<PreviewBox | null>(null);
 
+  // Guide line state
+  type MetricGuide = 'baseline' | 'xHeight' | 'capHeight' | 'ascender' | 'descender';
+  const [isDraggingGuide, setIsDraggingGuide] = useState(false);
+  const [draggedGuide, setDraggedGuide] = useState<MetricGuide | null>(null);
+  const [hoveredGuide, setHoveredGuide] = useState<MetricGuide | null>(null);
+  const [showGuides, setShowGuides] = useState(true);
+  const [guidesLocked, setGuidesLocked] = useState(true);
+
   // Calculate grid and canvas size - use default if glyph is not available
   const gridSize = glyph?.gridSize || 16;
   const canvasSize = gridSize * CELL_SIZE;
+
+  // Convert metric value to canvas Y coordinate
+  // Metrics: baseline=0, positive up, negative down
+  // Canvas: Y=0 at top, increases downward
+  const metricToY = useCallback((metricValue: number) => {
+    return canvasSize - (metricValue * CELL_SIZE);
+  }, [canvasSize]);
+
+  // Convert canvas Y coordinate to metric value
+  const yToMetric = useCallback((y: number) => {
+    return (canvasSize - y) / CELL_SIZE;
+  }, [canvasSize]);
+
+  // Get Y position for each guide
+  const getGuideY = useCallback((guide: MetricGuide): number => {
+    switch (guide) {
+      case 'baseline': return metricToY(font.metrics.baseline);
+      case 'xHeight': return metricToY(font.metrics.xHeight);
+      case 'capHeight': return metricToY(font.metrics.capHeight);
+      case 'ascender': return metricToY(font.metrics.ascender);
+      case 'descender': return metricToY(font.metrics.descender);
+    }
+  }, [font.metrics, metricToY]);
+
+  // Check if point is near a guide line (within 6 pixels)
+  const getGuideAtPoint = useCallback((y: number): MetricGuide | null => {
+    if (!showGuides || guidesLocked) return null;
+
+    const guides: MetricGuide[] = ['baseline', 'xHeight', 'capHeight', 'ascender', 'descender'];
+    const threshold = 6;
+
+    for (const guide of guides) {
+      const guideY = getGuideY(guide);
+      if (Math.abs(y - guideY) < threshold) {
+        return guide;
+      }
+    }
+    return null;
+  }, [showGuides, guidesLocked, getGuideY]);
+
+  // Update metrics when dragging guide
+  const updateGuideMetric = useCallback((guide: MetricGuide, y: number) => {
+    const metricValue = Math.round(yToMetric(y));
+
+    switch (guide) {
+      case 'baseline':
+        onUpdateMetrics({ baseline: metricValue });
+        break;
+      case 'xHeight':
+        onUpdateMetrics({ xHeight: metricValue });
+        break;
+      case 'capHeight':
+        onUpdateMetrics({ capHeight: metricValue });
+        break;
+      case 'ascender':
+        onUpdateMetrics({ ascender: metricValue });
+        break;
+      case 'descender':
+        onUpdateMetrics({ descender: metricValue });
+        break;
+    }
+  }, [yToMetric, onUpdateMetrics]);
 
   // All hooks must be called before any conditional returns
   const { flipHorizontal, flipVertical, rotate90, alignShapes } = useShapeTransform(
@@ -159,6 +231,15 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
       const point = getSVGPoint(e, svgRef.current);
 
+      // Check for guide line drag first (highest priority)
+      const guideAtPoint = getGuideAtPoint(point.y);
+      if (guideAtPoint) {
+        e.preventDefault();
+        setIsDraggingGuide(true);
+        setDraggedGuide(guideAtPoint);
+        return;
+      }
+
       // Check for resize handle (only works with single selection)
       if (tool === Tool.SELECT && selectedShapeIds.length === 1) {
         const target = e.target as SVGElement;
@@ -241,12 +322,24 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
         }
       }
     },
-    [tool, selectedShapeIds, selectedShapeType, glyph]
+    [tool, selectedShapeIds, selectedShapeType, glyph, getGuideAtPoint]
   );
 
   // Throttled mouse move handler for smooth 60fps performance
   const handleMouseMove = useCallback((e: React.MouseEvent<SVGSVGElement> | React.PointerEvent<SVGSVGElement>) => {
     const point = getSVGPoint(e, svgRef.current);
+
+    // Handle guide dragging
+    if (isDraggingGuide && draggedGuide) {
+      updateGuideMetric(draggedGuide, point.y);
+      return;
+    }
+
+    // Update hover state for guides (only when not dragging anything else)
+    if (!isDragging && !isResizing && !isSelecting && !drawStart) {
+      const guideAtPoint = getGuideAtPoint(point.y);
+      setHoveredGuide(guideAtPoint);
+    }
 
     if (drawStart && !isSelecting) {
       const width = Math.abs(point.x - drawStart.x);
@@ -380,6 +473,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     isDragging,
     isResizing,
     isSelecting,
+    isDraggingGuide,
+    draggedGuide,
     selectedShapeIds,
     dragStart,
     shapeStartPositions,
@@ -387,6 +482,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     resizeStartShape,
     canvasSize,
     onUpdateShape,
+    updateGuideMetric,
+    getGuideAtPoint,
   ]);
 
   // Create throttled version of handleMouseMove
@@ -402,6 +499,13 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   }, [throttledHandleMouseMove]);
 
   const handleMouseUp = useCallback(() => {
+    // Handle guide dragging end
+    if (isDraggingGuide) {
+      setIsDraggingGuide(false);
+      setDraggedGuide(null);
+      return;
+    }
+
     if (drawStart && previewBox && !isSelecting) {
       if (previewBox.width >= CELL_SIZE && previewBox.height >= CELL_SIZE) {
         saveToHistory();
@@ -455,6 +559,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     isDragging,
     isResizing,
     isSelecting,
+    isDraggingGuide,
     saveToHistory,
     onAddShape,
     selectedShapeType,
@@ -746,6 +851,26 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
         <div className="flex-1"></div>
 
         <button
+          onClick={() => setShowGuides(!showGuides)}
+          className={`tool-btn px-2.5 py-2 rounded ${showGuides ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-white text-neutral-700'}`}
+          title={showGuides ? 'Hide Guides' : 'Show Guides'}
+        >
+          <i className="ph ph-ruler text-base"></i>
+        </button>
+
+        {showGuides && (
+          <button
+            onClick={() => setGuidesLocked(!guidesLocked)}
+            className={`tool-btn px-2.5 py-2 rounded ${!guidesLocked ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-white text-neutral-700'}`}
+            title={guidesLocked ? 'Unlock Guides to Edit' : 'Lock Guides'}
+          >
+            <i className={`ph ${guidesLocked ? 'ph-lock' : 'ph-lock-open'} text-base`}></i>
+          </button>
+        )}
+
+        <div className="w-px h-6 bg-neutral-200"></div>
+
+        <button
           onClick={() => svgInputRef.current?.click()}
           className="tool-btn px-2.5 py-2 rounded bg-white text-neutral-700"
           title="Import SVG"
@@ -806,6 +931,131 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
           {/* Grid */}
           {gridPattern}
           <rect width={canvasSize} height={canvasSize} fill="url(#grid)" />
+
+          {/* Guide lines */}
+          {showGuides && (
+            <g className="guides">
+              {/* Ascender */}
+              <line
+                x1="0"
+                y1={getGuideY('ascender')}
+                x2={canvasSize}
+                y2={getGuideY('ascender')}
+                stroke={hoveredGuide === 'ascender' || draggedGuide === 'ascender' ? '#3b82f6' : (guidesLocked ? '#cbd5e1' : '#94a3b8')}
+                strokeWidth={hoveredGuide === 'ascender' || draggedGuide === 'ascender' ? '2' : '1'}
+                strokeDasharray="4 4"
+                opacity={guidesLocked ? '0.5' : '1'}
+                style={{ cursor: guidesLocked ? 'default' : 'ns-resize' }}
+              />
+              {!guidesLocked && (hoveredGuide === 'ascender' || draggedGuide === 'ascender') && (
+                <text
+                  x="4"
+                  y={getGuideY('ascender') - 4}
+                  fontSize="10"
+                  fill="#3b82f6"
+                  fontFamily="system-ui"
+                >
+                  Ascender ({font.metrics.ascender})
+                </text>
+              )}
+
+              {/* Cap Height */}
+              <line
+                x1="0"
+                y1={getGuideY('capHeight')}
+                x2={canvasSize}
+                y2={getGuideY('capHeight')}
+                stroke={hoveredGuide === 'capHeight' || draggedGuide === 'capHeight' ? '#8b5cf6' : (guidesLocked ? '#cbd5e1' : '#94a3b8')}
+                strokeWidth={hoveredGuide === 'capHeight' || draggedGuide === 'capHeight' ? '2' : '1'}
+                strokeDasharray="4 4"
+                opacity={guidesLocked ? '0.5' : '1'}
+                style={{ cursor: guidesLocked ? 'default' : 'ns-resize' }}
+              />
+              {!guidesLocked && (hoveredGuide === 'capHeight' || draggedGuide === 'capHeight') && (
+                <text
+                  x="4"
+                  y={getGuideY('capHeight') - 4}
+                  fontSize="10"
+                  fill="#8b5cf6"
+                  fontFamily="system-ui"
+                >
+                  Cap Height ({font.metrics.capHeight})
+                </text>
+              )}
+
+              {/* X Height */}
+              <line
+                x1="0"
+                y1={getGuideY('xHeight')}
+                x2={canvasSize}
+                y2={getGuideY('xHeight')}
+                stroke={hoveredGuide === 'xHeight' || draggedGuide === 'xHeight' ? '#10b981' : (guidesLocked ? '#cbd5e1' : '#94a3b8')}
+                strokeWidth={hoveredGuide === 'xHeight' || draggedGuide === 'xHeight' ? '2' : '1'}
+                strokeDasharray="4 4"
+                opacity={guidesLocked ? '0.5' : '1'}
+                style={{ cursor: guidesLocked ? 'default' : 'ns-resize' }}
+              />
+              {!guidesLocked && (hoveredGuide === 'xHeight' || draggedGuide === 'xHeight') && (
+                <text
+                  x="4"
+                  y={getGuideY('xHeight') - 4}
+                  fontSize="10"
+                  fill="#10b981"
+                  fontFamily="system-ui"
+                >
+                  X-Height ({font.metrics.xHeight})
+                </text>
+              )}
+
+              {/* Baseline */}
+              <line
+                x1="0"
+                y1={getGuideY('baseline')}
+                x2={canvasSize}
+                y2={getGuideY('baseline')}
+                stroke={hoveredGuide === 'baseline' || draggedGuide === 'baseline' ? '#ef4444' : (guidesLocked ? '#cbd5e1' : '#64748b')}
+                strokeWidth={hoveredGuide === 'baseline' || draggedGuide === 'baseline' ? '3' : '2'}
+                opacity={guidesLocked ? '0.5' : '1'}
+                style={{ cursor: guidesLocked ? 'default' : 'ns-resize' }}
+              />
+              {!guidesLocked && (hoveredGuide === 'baseline' || draggedGuide === 'baseline') && (
+                <text
+                  x="4"
+                  y={getGuideY('baseline') - 4}
+                  fontSize="10"
+                  fill="#ef4444"
+                  fontWeight="bold"
+                  fontFamily="system-ui"
+                >
+                  Baseline ({font.metrics.baseline})
+                </text>
+              )}
+
+              {/* Descender */}
+              <line
+                x1="0"
+                y1={getGuideY('descender')}
+                x2={canvasSize}
+                y2={getGuideY('descender')}
+                stroke={hoveredGuide === 'descender' || draggedGuide === 'descender' ? '#f59e0b' : (guidesLocked ? '#cbd5e1' : '#94a3b8')}
+                strokeWidth={hoveredGuide === 'descender' || draggedGuide === 'descender' ? '2' : '1'}
+                strokeDasharray="4 4"
+                opacity={guidesLocked ? '0.5' : '1'}
+                style={{ cursor: guidesLocked ? 'default' : 'ns-resize' }}
+              />
+              {!guidesLocked && (hoveredGuide === 'descender' || draggedGuide === 'descender') && (
+                <text
+                  x="4"
+                  y={getGuideY('descender') + 12}
+                  fontSize="10"
+                  fill="#f59e0b"
+                  fontFamily="system-ui"
+                >
+                  Descender ({font.metrics.descender})
+                </text>
+              )}
+            </g>
+          )}
 
           {/* Shapes - render all shapes first */}
           {glyph.shapes.map((shape) => renderShapeOnly(shape))}
