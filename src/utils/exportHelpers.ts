@@ -41,13 +41,15 @@ ${shapesStr}
 
 /**
  * Convert a shape to an opentype.js path
- * Coordinate system: Y-axis is flipped for fonts (0 at baseline, positive is up)
+ * Coordinate system: In fonts, Y=0 is at baseline, positive Y goes up
+ * In our canvas, Y=0 is at top, positive Y goes down
  */
 const shapeToOpentypePath = (shape: Shape, canvasSize: number): opentype.Path => {
   const path = new opentype.Path();
   const { type, x, y, width, height, rotation, corner } = shape;
 
-  // Flip Y coordinates for font coordinate system
+  // Simple Y-flip: canvas top (Y=0) becomes font top, canvas bottom becomes font bottom
+  // We'll handle baseline adjustment during scaling
   const flipY = (yCoord: number) => canvasSize - yCoord;
 
   const y1 = flipY(y + height); // Bottom in canvas = top in font
@@ -164,10 +166,14 @@ const shapeToOpentypePath = (shape: Shape, canvasSize: number): opentype.Path =>
  */
 export const exportFontAsTTF = (font: Font): void => {
   try {
-    console.log('exportFontAsTTF called', font);
-    console.log('opentype object:', opentype);
-
     const { meta, metrics, glyphs } = font;
+
+    // Check if any glyphs have shapes
+    const glyphsWithShapes = Object.values(glyphs).filter(g => g.shapes.length > 0);
+    if (glyphsWithShapes.length === 0) {
+      alert('No glyphs with shapes found!\n\nPlease draw shapes on some glyphs before exporting.\n\n1. Select a glyph from the left sidebar\n2. Use the Draw tool (D)\n3. Draw shapes on the canvas\n4. Then export your font');
+      return;
+    }
 
     // Calculate units per em (standard is 1000 for TrueType)
     const unitsPerEm = 1000;
@@ -177,7 +183,6 @@ export const exportFontAsTTF = (font: Font): void => {
     // Scale factor from canvas pixels to font units
     const scale = unitsPerEm / canvasSize;
 
-    console.log('Creating notdef glyph...');
     // Create notdef glyph (required for all fonts)
     const notdefGlyph = new opentype.Glyph({
       name: '.notdef',
@@ -189,8 +194,10 @@ export const exportFontAsTTF = (font: Font): void => {
     // Convert each glyph to opentype format
     const opentypeGlyphs: opentype.Glyph[] = [notdefGlyph];
 
-    console.log('Converting glyphs...', Object.keys(glyphs).length);
     Object.values(glyphs).forEach((glyph) => {
+      // Skip glyphs with no shapes
+      if (glyph.shapes.length === 0) return;
+
       const path = new opentype.Path();
 
       // Combine all shapes into one path
@@ -219,8 +226,6 @@ export const exportFontAsTTF = (font: Font): void => {
 
       opentypeGlyphs.push(opentypeGlyph);
     });
-
-    console.log('Creating font...');
     // Create the font
     // Note: metrics.descender is already negative in our data structure
     const opentypeFont = new opentype.Font({
@@ -232,10 +237,8 @@ export const exportFontAsTTF = (font: Font): void => {
       glyphs: opentypeGlyphs,
     });
 
-    console.log('Converting to array buffer...');
     // Download the font
     const arrayBuffer = opentypeFont.toArrayBuffer();
-    console.log('Creating blob and downloading...');
     const blob = new Blob([arrayBuffer], { type: 'font/ttf' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -243,7 +246,6 @@ export const exportFontAsTTF = (font: Font): void => {
     a.download = `${meta.familyName}-${meta.styleName}.ttf`;
     a.click();
     URL.revokeObjectURL(url);
-    console.log('TTF export complete!');
   } catch (error) {
     console.error('Error exporting TTF:', error);
     alert(`Error exporting TTF: ${error instanceof Error ? error.message : String(error)}`);

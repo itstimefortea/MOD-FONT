@@ -31,7 +31,11 @@ export const GlyphGrid: React.FC<GlyphGridProps> = React.memo(({
         viewBox={`0 0 ${gridSize * 32} ${gridSize * 32}`}
         className="mx-auto max-w-full max-h-full"
       >
-        {glyph.shapes.map((shape) => renderShapeOnly(shape))}
+        {glyph.shapes.map((shape) => (
+          <React.Fragment key={shape.id}>
+            {renderShapeOnly(shape)}
+          </React.Fragment>
+        ))}
       </svg>
     );
   };
