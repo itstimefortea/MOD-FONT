@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { ShapePalette } from './components/ShapePalette';
 import { GlyphGrid } from './components/GlyphGrid';
@@ -9,9 +9,11 @@ import { ShortcutsModal } from './components/ShortcutsModal';
 import { ResizablePanel } from './components/ResizablePanel';
 import { useFontEditor } from './hooks/useFontEditor';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { ShapeType, Tool } from './types';
+import { useShapeTransform } from './hooks/useShapeTransform';
+import { ShapeType, Tool, AlignmentType } from './types';
 import { exportFontAsJSON, exportFontAsTTF } from './utils/exportHelpers';
 import { validateFontWithErrors } from './utils/fontValidator';
+import { CELL_SIZE } from './constants/shapes';
 
 function App() {
   const {
@@ -40,6 +42,25 @@ function App() {
   useEffect(() => {
     setSelectedShapeIds([]);
   }, [currentGlyph]);
+
+  // Calculate canvas size for alignment operations
+  const glyph = font.glyphs[currentGlyph];
+  const canvasSize = useMemo(
+    () => (glyph?.gridSize || 16) * CELL_SIZE,
+    [glyph?.gridSize]
+  );
+
+  // Create alignment handler at App level
+  const { alignShapes } = useShapeTransform(canvasSize, saveToHistory, updateShape);
+
+  const handleAlignShape = useCallback(
+    (alignment: AlignmentType) => {
+      if (selectedShapeIds.length === 0 || !glyph) return;
+      const selectedShapes = glyph.shapes.filter(s => selectedShapeIds.includes(s.id));
+      alignShapes(selectedShapes, alignment);
+    },
+    [selectedShapeIds, glyph, alignShapes]
+  );
 
   const handleExportJSON = () => {
     exportFontAsJSON(font);
@@ -112,6 +133,11 @@ function App() {
         onSelectShape={setSelectedShapeType}
         tool={tool}
         onToolChange={setTool}
+        selectedShapeIds={selectedShapeIds}
+        onAlign={handleAlignShape}
+        font={font}
+        currentGlyph={currentGlyph}
+        onUpdateGlyph={updateGlyph}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
         <div className="flex-1 flex overflow-hidden">
@@ -151,6 +177,7 @@ function App() {
               onUpdateMetrics={updateMetrics}
               selectedShapeIds={selectedShapeIds}
               onSelectionChange={setSelectedShapeIds}
+              onAlign={handleAlignShape}
             />
           </div>
 
