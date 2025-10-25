@@ -33,6 +33,8 @@ interface EditorCanvasProps {
   saveToHistory: () => void;
   onDuplicateShape: (shapeId: number) => void;
   onUpdateMetrics: (updates: Partial<Font['metrics']>) => void;
+  selectedShapeIds: number[];
+  onSelectionChange: (ids: number[]) => void;
 }
 
 export const EditorCanvas: React.FC<EditorCanvasProps> = ({
@@ -51,6 +53,8 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   saveToHistory,
   onDuplicateShape,
   onUpdateMetrics,
+  selectedShapeIds,
+  onSelectionChange,
 }) => {
   const glyph = font.glyphs[currentGlyph];
   const svgRef = useRef<SVGSVGElement>(null);
@@ -63,7 +67,6 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [isResizing, setIsResizing] = useState(false);
   const [isSelecting, setIsSelecting] = useState(false);
-  const [selectedShapeIds, setSelectedShapeIds] = useState<number[]>([]);
   const [dragStart, setDragStart] = useState<SVGPoint | null>(null);
   const [shapeStartPositions, setShapeStartPositions] = useState<Map<number, SVGPoint>>(new Map());
   const [resizeStartShape, setResizeStartShape] = useState<Shape | null>(null);
@@ -168,7 +171,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     setIsDragging(false);
     setIsResizing(false);
     setIsSelecting(false);
-    setSelectedShapeIds([]);
+    onSelectionChange([]);
     setDragStart(null);
     setShapeStartPositions(new Map());
     setResizeStartShape(null);
@@ -176,7 +179,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     setDrawStart(null);
     setPreviewBox(null);
     setSelectionBox(null);
-  }, [glyph?.char]);
+  }, [glyph?.char, onSelectionChange]);
 
   // Handle shape transforms - now supports multiple shapes
   const handleFlipHorizontal = useCallback(() => {
@@ -278,51 +281,45 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
 
         if (clickedShape) {
           e.preventDefault();
-          
-          // Multi-selection with Shift or Cmd/Ctrl
-          if (e.shiftKey || e.metaKey || e.ctrlKey) {
-            if (selectedShapeIds.includes(clickedShape.id)) {
-              // Remove from selection
-              setSelectedShapeIds(selectedShapeIds.filter(id => id !== clickedShape.id));
+
+          const isModifierPressed = e.shiftKey || e.metaKey || e.ctrlKey;
+          const isAlreadySelected = selectedShapeIds.includes(clickedShape.id);
+
+          if (isModifierPressed) {
+            if (isAlreadySelected) {
+              onSelectionChange(selectedShapeIds.filter(id => id !== clickedShape.id));
             } else {
-              // Add to selection
-              setSelectedShapeIds([...selectedShapeIds, clickedShape.id]);
+              onSelectionChange([...selectedShapeIds, clickedShape.id]);
             }
           } else {
-            // Single selection or start drag
-            if (!selectedShapeIds.includes(clickedShape.id)) {
-              setSelectedShapeIds([clickedShape.id]);
+            const selectionForDrag = isAlreadySelected ? selectedShapeIds : [clickedShape.id];
+            if (!isAlreadySelected) {
+              onSelectionChange(selectionForDrag);
             }
-            
-            // Start dragging all selected shapes
+
             setIsDragging(true);
             setDragStart(point);
-            
-            // Store starting positions for all selected shapes
+
             const positions = new Map<number, SVGPoint>();
-            selectedShapeIds.forEach(id => {
+            selectionForDrag.forEach(id => {
               const shape = glyph.shapes.find(s => s.id === id);
               if (shape) {
                 positions.set(id, { x: shape.x, y: shape.y });
               }
             });
-            // Also add the clicked shape if it's being added to selection
-            if (!selectedShapeIds.includes(clickedShape.id)) {
-              positions.set(clickedShape.id, { x: clickedShape.x, y: clickedShape.y });
-            }
             setShapeStartPositions(positions);
           }
         } else {
           // Click on empty space - start selection box
           if (!e.shiftKey && !e.metaKey && !e.ctrlKey) {
-            setSelectedShapeIds([]);
+            onSelectionChange([]);
           }
           setIsSelecting(true);
           setDragStart(point);
         }
       }
     },
-    [tool, selectedShapeIds, selectedShapeType, glyph, getGuideAtPoint]
+    [tool, selectedShapeIds, selectedShapeType, glyph, getGuideAtPoint, onSelectionChange]
   );
 
   // Throttled mouse move handler for smooth 60fps performance
@@ -537,7 +534,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
           selectedIds.push(shape.id);
         }
       });
-      setSelectedShapeIds(selectedIds);
+      onSelectionChange(selectedIds);
       setSelectionBox(null);
       setIsSelecting(false);
     }
@@ -564,6 +561,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     onAddShape,
     selectedShapeType,
     glyph,
+    onSelectionChange,
   ]);
 
   // Keyboard shortcuts - now supports multiple selection
@@ -576,7 +574,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
         if (selectedShapeIds.length > 0) {
           e.preventDefault();
           selectedShapeIds.forEach(id => onDeleteShape(id));
-          setSelectedShapeIds([]);
+          onSelectionChange([]);
         }
       } else if (e.key === 'd' || e.key === 'D') {
         if (e.ctrlKey || e.metaKey) {
@@ -597,11 +595,11 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
           onToolChange(Tool.SELECT);
         }
       } else if (e.key === 'Escape') {
-        setSelectedShapeIds([]);
+        onSelectionChange([]);
       } else if (e.key === 'a' && (e.ctrlKey || e.metaKey)) {
         // Select all shapes
         e.preventDefault();
-        setSelectedShapeIds(glyph.shapes.map(s => s.id));
+        onSelectionChange(glyph.shapes.map(s => s.id));
       } else if ((e.key === 'h' || e.key === 'H') && selectedShapeIds.length > 0) {
         e.preventDefault();
         handleFlipHorizontal();
@@ -643,6 +641,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     handleRotate90,
     onDuplicateShape,
     handleAlignShape,
+    onSelectionChange,
   ]);
 
   // Memoize selected shapes to prevent unnecessary recalculations
@@ -815,7 +814,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             <button
               onClick={() => {
                 selectedShapeIds.forEach(id => onDeleteShape(id));
-                setSelectedShapeIds([]);
+                onSelectionChange([]);
               }}
               className="tool-btn px-3 py-1.5 rounded bg-white text-neutral-700 flex items-center gap-1.5"
               title="Delete (Del)"

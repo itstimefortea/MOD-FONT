@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Toolbar } from './components/Toolbar';
 import { ShapePalette } from './components/ShapePalette';
 import { GlyphGrid } from './components/GlyphGrid';
@@ -35,6 +35,11 @@ function App() {
   const [selectedShapeType, setSelectedShapeType] = useState(ShapeType.SQUARE);
   const [tool, setTool] = useState(Tool.DRAW);
   const [showShortcuts, setShowShortcuts] = useState(false);
+  const [selectedShapeIds, setSelectedShapeIds] = useState<number[]>([]);
+
+  useEffect(() => {
+    setSelectedShapeIds([]);
+  }, [currentGlyph]);
 
   const handleExportJSON = () => {
     exportFontAsJSON(font);
@@ -144,6 +149,8 @@ function App() {
               saveToHistory={saveToHistory}
               onDuplicateShape={duplicateShape}
               onUpdateMetrics={updateMetrics}
+              selectedShapeIds={selectedShapeIds}
+              onSelectionChange={setSelectedShapeIds}
             />
           </div>
 
@@ -161,6 +168,9 @@ function App() {
               currentGlyph={currentGlyph}
               onUpdateGlyph={updateGlyph}
               onUpdateMetrics={updateMetrics}
+              selectedShapeIds={selectedShapeIds}
+              onUpdateShape={updateShape}
+              onSaveHistory={saveToHistory}
             />
           </ResizablePanel>
         </div>
