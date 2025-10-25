@@ -10,9 +10,10 @@ import { ResizablePanel } from './components/ResizablePanel';
 import { useFontEditor } from './hooks/useFontEditor';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { useShapeTransform } from './hooks/useShapeTransform';
-import { ShapeType, Tool, AlignmentType } from './types';
+import { ShapeType, Tool, AlignmentType, Shape } from './types';
 import { exportFontAsJSON, exportFontAsTTF } from './utils/exportHelpers';
 import { validateFontWithErrors } from './utils/fontValidator';
+import { generateUniqueId } from './utils/shapeFactory';
 import { CELL_SIZE } from './constants/shapes';
 
 function App() {
@@ -38,6 +39,10 @@ function App() {
   const [tool, setTool] = useState(Tool.DRAW);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const [selectedShapeIds, setSelectedShapeIds] = useState<number[]>([]);
+
+  // Clipboard state for copy/paste between glyphs
+  const [clipboardShapes, setClipboardShapes] = useState<Shape[] | null>(null);
+  const [clipboardSourceGlyph, setClipboardSourceGlyph] = useState<string | null>(null);
 
   useEffect(() => {
     setSelectedShapeIds([]);
@@ -95,6 +100,62 @@ function App() {
     reader.readAsText(file);
     e.target.value = '';
   };
+
+  // Copy selected shapes to clipboard
+  const handleCopy = useCallback(() => {
+    if (selectedShapeIds.length === 0 || !glyph) return;
+
+    // Get selected shapes and deep clone them
+    const selectedShapes = glyph.shapes.filter(s => selectedShapeIds.includes(s.id));
+    const clonedShapes = JSON.parse(JSON.stringify(selectedShapes)) as Shape[];
+
+    setClipboardShapes(clonedShapes);
+    setClipboardSourceGlyph(currentGlyph);
+  }, [selectedShapeIds, glyph, currentGlyph]);
+
+  // Cut selected shapes to clipboard
+  const handleCut = useCallback(() => {
+    if (selectedShapeIds.length === 0 || !glyph) return;
+
+    // Get selected shapes and deep clone them
+    const selectedShapes = glyph.shapes.filter(s => selectedShapeIds.includes(s.id));
+    const clonedShapes = JSON.parse(JSON.stringify(selectedShapes)) as Shape[];
+
+    setClipboardShapes(clonedShapes);
+    setClipboardSourceGlyph(currentGlyph);
+
+    // Delete selected shapes from current glyph
+    saveToHistory();
+    selectedShapeIds.forEach(id => deleteShape(id));
+    setSelectedShapeIds([]);
+  }, [selectedShapeIds, glyph, currentGlyph, saveToHistory, deleteShape]);
+
+  // Paste shapes from clipboard
+  const handlePaste = useCallback(() => {
+    if (!clipboardShapes || clipboardShapes.length === 0 || !glyph) return;
+
+    saveToHistory();
+
+    const newShapeIds: number[] = [];
+    const isSameGlyph = clipboardSourceGlyph === currentGlyph;
+
+    clipboardShapes.forEach(shape => {
+      // Create new shape with new ID
+      const newShape: Shape = {
+        ...shape,
+        id: generateUniqueId(),
+        // Offset position if pasting into same glyph
+        x: isSameGlyph ? shape.x + CELL_SIZE : shape.x,
+        y: isSameGlyph ? shape.y + CELL_SIZE : shape.y,
+      };
+
+      addShape(newShape);
+      newShapeIds.push(newShape.id);
+    });
+
+    // Select the newly pasted shapes
+    setSelectedShapeIds(newShapeIds);
+  }, [clipboardShapes, clipboardSourceGlyph, currentGlyph, glyph, saveToHistory, addShape]);
 
   // Global keyboard shortcuts using centralized hook
   useKeyboardShortcuts([
@@ -178,6 +239,9 @@ function App() {
               selectedShapeIds={selectedShapeIds}
               onSelectionChange={setSelectedShapeIds}
               onAlign={handleAlignShape}
+              onCopy={handleCopy}
+              onCut={handleCut}
+              onPaste={handlePaste}
             />
           </div>
 

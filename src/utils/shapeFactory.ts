@@ -1,7 +1,7 @@
 import { Shape, ShapeType, ArcCorner } from '../types';
 
 // Generate a cryptographically secure unique ID
-const generateUniqueId = (): number => {
+export const generateUniqueId = (): number => {
   const timestamp = Date.now();
   const randomValues = new Uint32Array(1);
   crypto.getRandomValues(randomValues);

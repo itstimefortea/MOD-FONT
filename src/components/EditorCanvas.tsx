@@ -36,6 +36,9 @@ interface EditorCanvasProps {
   selectedShapeIds: number[];
   onSelectionChange: (ids: number[]) => void;
   onAlign: (alignment: AlignmentType) => void;
+  onCopy: () => void;
+  onCut: () => void;
+  onPaste: () => void;
 }
 
 export const EditorCanvas: React.FC<EditorCanvasProps> = ({
@@ -57,6 +60,9 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   selectedShapeIds,
   onSelectionChange,
   onAlign,
+  onCopy,
+  onCut,
+  onPaste,
 }) => {
   const glyph = font.glyphs[currentGlyph];
   const svgRef = useRef<SVGSVGElement>(null);
@@ -565,6 +571,18 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
           selectedShapeIds.forEach(id => onDeleteShape(id));
           onSelectionChange([]);
         }
+      } else if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey)) {
+        // Copy selected shapes
+        e.preventDefault();
+        onCopy();
+      } else if ((e.key === 'x' || e.key === 'X') && (e.ctrlKey || e.metaKey)) {
+        // Cut selected shapes
+        e.preventDefault();
+        onCut();
+      } else if ((e.key === 'v' || e.key === 'V') && (e.ctrlKey || e.metaKey)) {
+        // Paste shapes from clipboard
+        e.preventDefault();
+        onPaste();
       } else if (e.key === 'd' || e.key === 'D') {
         if (e.ctrlKey || e.metaKey) {
           e.preventDefault();
@@ -631,6 +649,9 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     onDuplicateShape,
     onAlign,
     onSelectionChange,
+    onCopy,
+    onCut,
+    onPaste,
   ]);
 
   // Memoize selected shapes to prevent unnecessary recalculations
