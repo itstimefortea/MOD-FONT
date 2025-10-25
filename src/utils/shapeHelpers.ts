@@ -1,4 +1,6 @@
 import { Shape, ShapeType } from '../types';
+import { CELL_SIZE } from '../constants/shapes';
+import { clamp } from './performanceHelpers';
 
 /**
  * Calculate shape bounds for better collision detection
@@ -70,3 +72,27 @@ export function getShapeDescription(shape: Shape): string {
   return `${typeNames[shape.type]} at position (${Math.round(shape.x)}, ${Math.round(shape.y)})`;
 }
 
+/**
+ * Normalize a shape so it remains within the bounds of a glyph canvas.
+ * Useful when pasting shapes across glyphs with different grid sizes.
+ */
+export function normalizeShapeToCanvas(shape: Shape, gridSize: number): Shape {
+  const canvasSize = gridSize * CELL_SIZE;
+
+  const snap = (value: number) => Math.round(value / CELL_SIZE) * CELL_SIZE;
+  const snapDimension = (dimension: number) => {
+    const snapped = snap(dimension);
+    return clamp(snapped, CELL_SIZE, canvasSize);
+  };
+
+  const width = Math.min(snapDimension(shape.width), canvasSize);
+  const height = Math.min(snapDimension(shape.height), canvasSize);
+
+  const maxX = Math.max(0, canvasSize - width);
+  const maxY = Math.max(0, canvasSize - height);
+
+  const x = clamp(snap(shape.x), 0, maxX);
+  const y = clamp(snap(shape.y), 0, maxY);
+
+  return { ...shape, x, y, width, height };
+}

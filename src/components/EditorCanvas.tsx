@@ -25,7 +25,7 @@ interface EditorCanvasProps {
   onToolChange: (tool: Tool) => void;
   onAddShape: (shape: Shape) => void;
   onUpdateShape: (shapeId: number, updates: Partial<Shape>) => void;
-  onDeleteShape: (shapeId: number) => void;
+  onDeleteShapes: (shapeIds: number[]) => void;
   onClearGlyph: () => void;
   onUndo: () => void;
   onRedo: () => void;
@@ -49,7 +49,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   onToolChange,
   onAddShape,
   onUpdateShape,
-  onDeleteShape,
+  onDeleteShapes,
   onClearGlyph,
   onUndo,
   onRedo,
@@ -568,7 +568,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       if (e.key === 'Delete' || e.key === 'Backspace') {
         if (selectedShapeIds.length > 0) {
           e.preventDefault();
-          selectedShapeIds.forEach(id => onDeleteShape(id));
+          onDeleteShapes(selectedShapeIds);
           onSelectionChange([]);
         }
       } else if ((e.key === 'c' || e.key === 'C') && (e.ctrlKey || e.metaKey)) {
@@ -641,7 +641,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   }, [
     selectedShapeIds,
     glyph,
-    onDeleteShape,
+    onDeleteShapes,
     onToolChange,
     handleFlipHorizontal,
     handleFlipVertical,
@@ -775,8 +775,10 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             </div>
             <button
               onClick={() => {
-                selectedShapeIds.forEach(id => onDeleteShape(id));
-                onSelectionChange([]);
+                if (selectedShapeIds.length > 0) {
+                  onDeleteShapes(selectedShapeIds);
+                  onSelectionChange([]);
+                }
               }}
               className="tool-btn px-3 py-1.5 rounded bg-white text-neutral-700 flex items-center gap-1.5"
               title="Delete (Del)"
