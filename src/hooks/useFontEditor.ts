@@ -171,6 +171,78 @@ export const useFontEditor = () => {
     [currentGlyph, cancelScheduledFrame, applyPendingShapeUpdates]
   );
 
+  const addShapes = useCallback(
+    (shapes: Shape[]) => {
+      if (!shapes || shapes.length === 0) {
+        return;
+      }
+
+      cancelScheduledFrame();
+      applyPendingShapeUpdates();
+
+      setFont(prevFont => {
+        const glyph = prevFont.glyphs[currentGlyph];
+        if (!glyph) return prevFont;
+
+        return {
+          ...prevFont,
+          glyphs: {
+            ...prevFont.glyphs,
+            [currentGlyph]: {
+              ...glyph,
+              shapes: [...glyph.shapes, ...shapes],
+              modifiedAt: Date.now(),
+            },
+          },
+        };
+      });
+    },
+    [currentGlyph, cancelScheduledFrame, applyPendingShapeUpdates]
+  );
+
+  const deleteShapes = useCallback(
+    (shapeIds: number[]) => {
+      if (!shapeIds || shapeIds.length === 0) {
+        return;
+      }
+
+      const glyph = font.glyphs[currentGlyph];
+      if (!glyph) return;
+
+      const idsToRemove = new Set(shapeIds);
+      const hasAny = glyph.shapes.some(shape => idsToRemove.has(shape.id));
+      if (!hasAny) {
+        return;
+      }
+
+      saveToHistory();
+      shapeIds.forEach(id => removePendingUpdateForShape(currentGlyph, id));
+
+      setFont(prevFont => {
+        const targetGlyph = prevFont.glyphs[currentGlyph];
+        if (!targetGlyph) return prevFont;
+
+        const filteredShapes = targetGlyph.shapes.filter(shape => !idsToRemove.has(shape.id));
+        if (filteredShapes.length === targetGlyph.shapes.length) {
+          return prevFont;
+        }
+
+        return {
+          ...prevFont,
+          glyphs: {
+            ...prevFont.glyphs,
+            [currentGlyph]: {
+              ...targetGlyph,
+              shapes: filteredShapes,
+              modifiedAt: Date.now(),
+            },
+          },
+        };
+      });
+    },
+    [font, currentGlyph, saveToHistory, removePendingUpdateForShape]
+  );
+
   const updateShape = useCallback(
     (shapeId: number, updates: Partial<Shape>) => {
       if (!updates || Object.keys(updates).length === 0) {
@@ -196,35 +268,9 @@ export const useFontEditor = () => {
 
   const deleteShape = useCallback(
     (shapeId: number) => {
-      const glyph = font.glyphs[currentGlyph];
-      if (!glyph) return;
-
-      saveToHistory();
-      removePendingUpdateForShape(currentGlyph, shapeId);
-
-      setFont(prevFont => {
-        const targetGlyph = prevFont.glyphs[currentGlyph];
-        if (!targetGlyph) return prevFont;
-
-        const newShapes = targetGlyph.shapes.filter(s => s.id !== shapeId);
-        if (newShapes.length === targetGlyph.shapes.length) {
-          return prevFont;
-        }
-
-        return {
-          ...prevFont,
-          glyphs: {
-            ...prevFont.glyphs,
-            [currentGlyph]: {
-              ...targetGlyph,
-              shapes: newShapes,
-              modifiedAt: Date.now(),
-            },
-          },
-        };
-      });
+      deleteShapes([shapeId]);
     },
-    [font, currentGlyph, saveToHistory, removePendingUpdateForShape]
+    [deleteShapes]
   );
 
   const duplicateShape = useCallback(
@@ -416,8 +462,10 @@ export const useFontEditor = () => {
     setCurrentGlyph,
     saveToHistory,
     addShape,
+    addShapes,
     updateShape,
     deleteShape,
+    deleteShapes,
     duplicateShape,
     clearGlyph,
     undo,

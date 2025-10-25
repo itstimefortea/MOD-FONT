@@ -15,6 +15,7 @@ import { exportFontAsJSON, exportFontAsTTF } from './utils/exportHelpers';
 import { validateFontWithErrors } from './utils/fontValidator';
 import { generateUniqueId } from './utils/shapeFactory';
 import { CELL_SIZE } from './constants/shapes';
+import { normalizeShapeToCanvas } from './utils/shapeHelpers';
 
 function App() {
   const {
@@ -24,8 +25,9 @@ function App() {
     setCurrentGlyph,
     saveToHistory,
     addShape,
+    addShapes,
     updateShape,
-    deleteShape,
+    deleteShapes,
     duplicateShape,
     clearGlyph,
     undo,
@@ -124,38 +126,45 @@ function App() {
     setClipboardShapes(clonedShapes);
     setClipboardSourceGlyph(currentGlyph);
 
-    // Delete selected shapes from current glyph
-    saveToHistory();
-    selectedShapeIds.forEach(id => deleteShape(id));
+    // Delete selected shapes from current glyph in a single state update
+    deleteShapes(selectedShapeIds);
     setSelectedShapeIds([]);
-  }, [selectedShapeIds, glyph, currentGlyph, saveToHistory, deleteShape]);
+  }, [selectedShapeIds, glyph, currentGlyph, deleteShapes]);
 
   // Paste shapes from clipboard
   const handlePaste = useCallback(() => {
     if (!clipboardShapes || clipboardShapes.length === 0 || !glyph) return;
 
-    saveToHistory();
-
-    const newShapeIds: number[] = [];
     const isSameGlyph = clipboardSourceGlyph === currentGlyph;
+    const targetGrid = glyph.gridSize;
+    const offsetStep = isSameGlyph ? CELL_SIZE : 0;
 
-    clipboardShapes.forEach(shape => {
-      // Create new shape with new ID
-      const newShape: Shape = {
+    const shapesToAdd: Shape[] = clipboardShapes.map((shape, index) => {
+      const offsetMultiplier = isSameGlyph ? index + 1 : 0;
+      const offset = offsetMultiplier * offsetStep;
+
+      const baseShape: Shape = {
         ...shape,
         id: generateUniqueId(),
-        // Offset position if pasting into same glyph
-        x: isSameGlyph ? shape.x + CELL_SIZE : shape.x,
-        y: isSameGlyph ? shape.y + CELL_SIZE : shape.y,
+        x: shape.x + offset,
+        y: shape.y + offset,
       };
 
-      addShape(newShape);
-      newShapeIds.push(newShape.id);
+      return normalizeShapeToCanvas(baseShape, targetGrid);
     });
+
+    if (shapesToAdd.length === 0) {
+      return;
+    }
+
+    saveToHistory();
+    addShapes(shapesToAdd);
+
+    const newShapeIds = shapesToAdd.map(shape => shape.id);
 
     // Select the newly pasted shapes
     setSelectedShapeIds(newShapeIds);
-  }, [clipboardShapes, clipboardSourceGlyph, currentGlyph, glyph, saveToHistory, addShape]);
+  }, [clipboardShapes, clipboardSourceGlyph, currentGlyph, glyph, addShapes, saveToHistory]);
 
   // Global keyboard shortcuts using centralized hook
   useKeyboardShortcuts([
@@ -228,7 +237,7 @@ function App() {
               onToolChange={setTool}
               onAddShape={addShape}
               onUpdateShape={updateShape}
-              onDeleteShape={deleteShape}
+              onDeleteShapes={deleteShapes}
               onClearGlyph={clearGlyph}
               onUndo={undo}
               onRedo={redo}
