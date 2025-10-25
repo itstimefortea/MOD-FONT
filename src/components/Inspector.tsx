@@ -212,30 +212,6 @@ export const Inspector: React.FC<InspectorProps> = ({
 
         <div className="pt-4 border-t border-neutral-200">
           <h3 className="text-xs font-medium mb-3 text-neutral-500 uppercase tracking-wide">
-            Grid Resolution
-          </h3>
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs text-neutral-500 block mb-1">
-                Grid Size
-              </label>
-              <select
-                value={glyph.gridSize}
-                onChange={(e) => onUpdateGlyph('gridSize', parseInt(e.target.value))}
-                className="w-full px-2 py-1 text-xs border border-neutral-300 rounded"
-              >
-                <option value="6">6×6</option>
-                <option value="8">8×8</option>
-                <option value="10">10×10</option>
-                <option value="12">12×12</option>
-                <option value="16">16×16</option>
-              </select>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-neutral-200">
-          <h3 className="text-xs font-medium mb-3 text-neutral-500 uppercase tracking-wide">
             Shape
           </h3>
           {selectedShapes.length === 0 && (

@@ -35,6 +35,7 @@ interface EditorCanvasProps {
   onUpdateMetrics: (updates: Partial<Font['metrics']>) => void;
   selectedShapeIds: number[];
   onSelectionChange: (ids: number[]) => void;
+  onAlign: (alignment: AlignmentType) => void;
 }
 
 export const EditorCanvas: React.FC<EditorCanvasProps> = ({
@@ -55,6 +56,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   onUpdateMetrics,
   selectedShapeIds,
   onSelectionChange,
+  onAlign,
 }) => {
   const glyph = font.glyphs[currentGlyph];
   const svgRef = useRef<SVGSVGElement>(null);
@@ -150,7 +152,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
   }, [yToMetric, onUpdateMetrics]);
 
   // All hooks must be called before any conditional returns
-  const { flipHorizontal, flipVertical, rotate90, alignShapes } = useShapeTransform(
+  const { flipHorizontal, flipVertical, rotate90 } = useShapeTransform(
     canvasSize,
     saveToHistory,
     onUpdateShape
@@ -205,19 +207,6 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       if (shape) rotate90(shape);
     });
   }, [selectedShapeIds, glyph, rotate90]);
-
-  const handleAlignShape = useCallback(
-    (alignment: AlignmentType) => {
-      if (selectedShapeIds.length === 0 || !glyph) return;
-
-      // Get all selected shapes
-      const selectedShapes = glyph.shapes.filter(s => selectedShapeIds.includes(s.id));
-
-      // Use the new alignShapes function that handles multi-selection properly
-      alignShapes(selectedShapes, alignment);
-    },
-    [selectedShapeIds, glyph, alignShapes]
-  );
 
   // Export SVG
   const handleExportGlyphSVG = useCallback(() => {
@@ -609,22 +598,22 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
       } else if (e.shiftKey && selectedShapeIds.length > 0) {
         if (e.key === 'L') {
           e.preventDefault();
-          handleAlignShape(AlignmentType.LEFT);
+          onAlign(AlignmentType.LEFT);
         } else if (e.key === 'R') {
           e.preventDefault();
-          handleAlignShape(AlignmentType.RIGHT);
+          onAlign(AlignmentType.RIGHT);
         } else if (e.key === 'T') {
           e.preventDefault();
-          handleAlignShape(AlignmentType.TOP);
+          onAlign(AlignmentType.TOP);
         } else if (e.key === 'B') {
           e.preventDefault();
-          handleAlignShape(AlignmentType.BOTTOM);
+          onAlign(AlignmentType.BOTTOM);
         } else if (e.key === 'C') {
           e.preventDefault();
-          handleAlignShape(AlignmentType.CENTER_H);
+          onAlign(AlignmentType.CENTER_H);
         } else if (e.key === 'M') {
           e.preventDefault();
-          handleAlignShape(AlignmentType.CENTER_V);
+          onAlign(AlignmentType.CENTER_V);
         }
       }
     };
@@ -640,7 +629,7 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
     handleFlipVertical,
     handleRotate90,
     onDuplicateShape,
-    handleAlignShape,
+    onAlign,
     onSelectionChange,
   ]);
 
@@ -754,54 +743,6 @@ export const EditorCanvas: React.FC<EditorCanvasProps> = ({
             >
               <i className="ph ph-copy text-base"></i>
             </button>
-
-            <div className="w-px h-6 bg-neutral-200"></div>
-
-            <div className="flex gap-1">
-              <button
-                onClick={() => handleAlignShape(AlignmentType.LEFT)}
-                className="tool-btn px-2 py-1.5 rounded text-xs"
-                title="Align Left (Shift+L)"
-              >
-                <i className="ph ph-align-left text-base"></i>
-              </button>
-              <button
-                onClick={() => handleAlignShape(AlignmentType.CENTER_H)}
-                className="tool-btn px-2 py-1.5 rounded text-xs"
-                title="Center H (Shift+C)"
-              >
-                <i className="ph ph-align-center-horizontal text-base"></i>
-              </button>
-              <button
-                onClick={() => handleAlignShape(AlignmentType.RIGHT)}
-                className="tool-btn px-2 py-1.5 rounded text-xs"
-                title="Align Right (Shift+R)"
-              >
-                <i className="ph ph-align-right text-base"></i>
-              </button>
-              <div className="w-px h-4 bg-neutral-200 mx-1"></div>
-              <button
-                onClick={() => handleAlignShape(AlignmentType.TOP)}
-                className="tool-btn px-2 py-1.5 rounded text-xs"
-                title="Align Top (Shift+T)"
-              >
-                <i className="ph ph-align-top text-base"></i>
-              </button>
-              <button
-                onClick={() => handleAlignShape(AlignmentType.CENTER_V)}
-                className="tool-btn px-2 py-1.5 rounded text-xs"
-                title="Center V (Shift+M)"
-              >
-                <i className="ph ph-align-center-vertical text-base"></i>
-              </button>
-              <button
-                onClick={() => handleAlignShape(AlignmentType.BOTTOM)}
-                className="tool-btn px-2 py-1.5 rounded text-xs"
-                title="Align Bottom (Shift+B)"
-              >
-                <i className="ph ph-align-bottom text-base"></i>
-              </button>
-            </div>
 
             <div className="w-px h-6 bg-neutral-200"></div>
 
